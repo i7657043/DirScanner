@@ -41,7 +41,7 @@ internal class Program
     private static void SetupLogger(string loggerOutputFormat)
     {
         Log.Logger = new LoggerConfiguration()
-        .MinimumLevel.Information()
+        .MinimumLevel.Debug()
         .WriteTo.File("log.txt", outputTemplate: loggerOutputFormat)
         .WriteTo.Console(outputTemplate: loggerOutputFormat)
         .CreateLogger();

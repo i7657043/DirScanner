@@ -11,29 +11,23 @@ internal class ResourceLister : IResourceLister
 
     public async Task<int> Run()
     {
-        await Task.Delay(1000);
-
         TraverseAll(@"c:\fv\n");
 
         return await Task.FromResult(0);
     }
 
-    private List<DirData> TraverseAll(string path)
+    private void TraverseAll(string path)
     {
-        List<DirData> allDirs = new List<DirData>();
-
         Directory.GetDirectories(path).ToList().ForEach(dir =>
         {        
-            _logger.LogInformation("--- Traversing entire dir: {Dir} ---", dir);
+            _logger.LogDebug("--- Traversing entire dir: {Dir} ---", dir);
 
             List<DirData> data = GetEntireDirData(dir);
 
             double dirSize = data.Select(x => x.Size).Sum();
         
-            _logger.LogInformation("/// Traversal of entire dir: {Dir} complete. Size: {DirSize} KB ///\n", dir, dirSize);
+            _logger.LogDebug("/// Traversal of entire dir: {Dir} complete. Size: {DirSize} KB ///", dir, dirSize);
         });
-
-        return allDirs;
     }
 
     private List<DirData> GetEntireDirData(string path)
@@ -55,15 +49,15 @@ internal class ResourceLister : IResourceLister
 
         totalNumberOfFiles += numOfFilesInDir;
 
-        _logger.LogInformation("{FileCount} files in this Dir", numOfFilesInDir);
+        _logger.LogDebug("{FileCount} file/s found", numOfFilesInDir);
 
         allDirs.Add(new DirData(path, GetAllFilesSize(files)));
 
         Directory.GetDirectories(path).ToList().ForEach(dir => 
         {
-            _logger.LogInformation("Traversing dir: {Dir}", dir);
+            _logger.LogDebug("Traversing dir: {Dir}", dir);
 
-            TraverseDirectories(dir, allDirs, currentLevelsDeep, totalNumberOfFiles);            
+            TraverseDirectories(dir, allDirs, currentLevelsDeep, totalNumberOfFiles); //should this be get entire dir data?
         });
 
         return allDirs;

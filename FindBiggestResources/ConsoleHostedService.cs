@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 internal class ConsoleHostedService : IHostedService
 {
@@ -20,19 +21,23 @@ internal class ConsoleHostedService : IHostedService
         {
             Task.Run(async () =>
             {
+                await Task.Delay(500);
+
+                string? appName = Assembly.GetExecutingAssembly().GetName().Name;
+
                 try
                 {
-                    _logger.LogInformation("Process started");
+                    _logger.LogInformation("{AppName} Process started", appName);
 
                     int exitCode = await _app.Run();
 
-                    _logger.LogInformation("Process finished with Exit Code: {@ExitCode}", exitCode);
+                    _logger.LogInformation("{AppName} Process finished with Exit Code: {@ExitCode}", appName, exitCode);
 
                     _appLifetime.StopApplication();
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogCritical("Process exited early with exception {@Exception}", ex);
+                    _logger.LogCritical("{AppName} Process exited early with exception {@Exception}", appName, ex);
 
                     Environment.Exit(-1);
                 }
