@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Drawing;
 using System.Runtime.CompilerServices;
 
 internal class ResourceLister : IResourceLister
@@ -12,52 +13,57 @@ internal class ResourceLister : IResourceLister
 
     public async Task<int> Run()
     {
-        int counter = 0;
-        List<string> dirsToSearch = new List<string>();
-        GetAllDirs(@"c:\fv\n", dirsToSearch);
-        int outerCounter = 0;
+        List<DirData> dirsToSearch = new List<DirData>();
+        _logger.LogInformation("Scanning first pass...");
+        GetAllDirsFirstPass(@"c:\fv", dirsToSearch);
+        _logger.LogInformation("Done");
 
-        foreach (string dirToSearch in dirsToSearch)
+        List<DirData> dirData = new List<DirData>();
+
+        foreach (DirData dirToSearch in dirsToSearch)
         {
-            counter = 0; 
-            _logger.LogInformation("---Dir to find total for dir #{Counter}: {Dir}---", ++outerCounter, dirToSearch);
+            //_logger.LogInformation($"Scanning second pass dir: {dirToSearch.Path} ...");
+            GetAllDirsSecondPass(dirToSearch.Path, dirData, dirsToSearch);
+            //_logger.LogInformation("Done");
 
-            List<DirData> dirData = new List<DirData>();
+            double size = dirData.Select(dir => dir.Size / 1024).Sum().ToTwoDecimalPlaces();
+            double sizeMB = (size / 1024).ToTwoDecimalPlaces();
+            double sizeGB = (sizeMB / 1024).ToTwoDecimalPlaces();
 
-            GetAllDirsWithTotals(dirToSearch, dirData);
-            
-            dirData.ForEach(dir => _logger.LogInformation("Cumulating total for dir #{Counter}: {Dir} :: Total Size: {Size} KB", ++counter, dir.Path, dir.Size.ToKBTwoDecimalPlaces()));
-            _logger.LogInformation("---Total Size for dir #{Counter}: {Dir} :: Total Size: {Size} KB---", outerCounter, dirToSearch, dirData.Select(dir => dir.Size).Sum().ToKBTwoDecimalPlaces());
+            //_logger.LogInformation("Total Size for dir #{Counter}: {Dir} :: " + $"{size}KB" + ((size > 1024) ? $" {sizeMB}MB" : "") + ((sizeMB > 1024) ? $" {sizeGB}GB" : ""), ++outerCounter, dirToSearch.Path, size);
         }
+
+        dirData = dirData.OrderBy(dir => dir.Size).ToList();
 
         return await Task.FromResult(0);
     }
 
-    private void GetAllDirsWithTotals(string path, List<DirData> dirData)
+    private void GetAllDirsFirstPass(string path, List<DirData> dirData)
     {
         FileInfo[] files = new DirectoryInfo(path).GetFiles();
         dirData.Add(new DirData(path, files.Select(file => file.Length).Sum()));
 
         Directory.GetDirectories(path).ToList().ForEach(dir =>
         {
-            GetAllDirsWithTotals(dir, dirData);
+            GetAllDirsFirstPass(dir, dirData);
         });
     }
 
-    private void GetAllDirs(string path, List<string> allDirs)
+    private void GetAllDirsSecondPass(string path, List<DirData> dirData, List<DirData> scannedDirs)
     {
-        allDirs.Add(path);
-
+        DirData alreadyScannedDir = scannedDirs.First(dir => dir.Path == path);
+        dirData.Add(alreadyScannedDir);
+        
         Directory.GetDirectories(path).ToList().ForEach(dir =>
         {
-            GetAllDirs(dir, allDirs);
+            GetAllDirsSecondPass(dir, dirData, scannedDirs);
         });
     }
 }
 
 public static class DoubleExtensions
 {
-    public static double ToKBTwoDecimalPlaces(this double num) => Math.Round(num / 1024, 2);
+    public static double ToTwoDecimalPlaces(this double num) => Math.Round(num, 2);
 }
 
 public class DirData
