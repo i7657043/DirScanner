@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 internal class ResourceLister : IResourceLister
 {
@@ -11,66 +12,52 @@ internal class ResourceLister : IResourceLister
 
     public async Task<int> Run()
     {
-        TraverseAll(@"c:\fv\n");
+        int counter = 0;
+        List<string> dirsToSearch = new List<string>();
+        GetAllDirs(@"c:\fv\n", dirsToSearch);
+        int outerCounter = 0;
+
+        foreach (string dirToSearch in dirsToSearch)
+        {
+            counter = 0; 
+            _logger.LogInformation("---Dir to find total for dir #{Counter}: {Dir}---", ++outerCounter, dirToSearch);
+
+            List<DirData> dirData = new List<DirData>();
+
+            GetAllDirsWithTotals(dirToSearch, dirData);
+            
+            dirData.ForEach(dir => _logger.LogInformation("Cumulating total for dir #{Counter}: {Dir} :: Total Size: {Size} KB", ++counter, dir.Path, dir.Size.ToKBTwoDecimalPlaces()));
+            _logger.LogInformation("---Total Size for dir #{Counter}: {Dir} :: Total Size: {Size} KB---", outerCounter, dirToSearch, dirData.Select(dir => dir.Size).Sum().ToKBTwoDecimalPlaces());
+        }
 
         return await Task.FromResult(0);
     }
 
-    private void TraverseAll(string path)
+    private void GetAllDirsWithTotals(string path, List<DirData> dirData)
     {
-        Directory.GetDirectories(path).ToList().ForEach(dir =>
-        {        
-            _logger.LogDebug("--- Traversing entire dir: {Dir} ---", dir);
-
-            List<DirData> data = GetEntireDirData(dir);
-
-            double dirSize = data.Select(x => x.Size).Sum();
-        
-            _logger.LogDebug("/// Traversal of entire dir: {Dir} complete. Size: {DirSize} KB ///", dir, dirSize);
-        });
-    }
-
-    private List<DirData> GetEntireDirData(string path)
-    {
-        List<DirData> allDirsForThisDir = new List<DirData>();
-
-        allDirsForThisDir = TraverseDirectories(path, allDirsForThisDir, 0, 0);
-
-        return allDirsForThisDir;
-    }
-
-    private List<DirData> TraverseDirectories(string path, List<DirData> allDirs, int currentLevelsDeep, int totalNumberOfFiles)
-    {
-        currentLevelsDeep++;
-
         FileInfo[] files = new DirectoryInfo(path).GetFiles();
+        dirData.Add(new DirData(path, files.Select(file => file.Length).Sum()));
 
-        int numOfFilesInDir = files.Length;
-
-        totalNumberOfFiles += numOfFilesInDir;
-
-        _logger.LogDebug("{FileCount} file/s found", numOfFilesInDir);
-
-        allDirs.Add(new DirData(path, GetAllFilesSize(files)));
-
-        Directory.GetDirectories(path).ToList().ForEach(dir => 
+        Directory.GetDirectories(path).ToList().ForEach(dir =>
         {
-            _logger.LogDebug("Traversing dir: {Dir}", dir);
-
-            TraverseDirectories(dir, allDirs, currentLevelsDeep, totalNumberOfFiles); //should this be get entire dir data?
+            GetAllDirsWithTotals(dir, dirData);
         });
-
-        return allDirs;
     }
 
-    public double GetAllFilesSize(FileInfo[] files)
+    private void GetAllDirs(string path, List<string> allDirs)
     {
-        double totalKBytes = 0;
+        allDirs.Add(path);
 
-        files.ToList().ForEach(file => totalKBytes += file.Length / 1024);
-
-        return totalKBytes;
+        Directory.GetDirectories(path).ToList().ForEach(dir =>
+        {
+            GetAllDirs(dir, allDirs);
+        });
     }
+}
+
+public static class DoubleExtensions
+{
+    public static double ToKBTwoDecimalPlaces(this double num) => Math.Round(num / 1024, 2);
 }
 
 public class DirData
@@ -84,4 +71,3 @@ public class DirData
     public string Path { get; set; }
     public double Size { get; set; }
 }
-
