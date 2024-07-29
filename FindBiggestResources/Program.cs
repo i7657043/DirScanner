@@ -27,6 +27,8 @@ internal class Program
 
                    Log.Logger.Information("Resource Lister Process starting...");
 
+                   services.Configure<ConsoleLifetimeOptions>(options => options.SuppressStatusMessages = true);
+
                    services.AddSingleton<IResourceLister, ResourceLister>().AddHostedService<ConsoleHostedService>();
                })
                .UseSerilog()

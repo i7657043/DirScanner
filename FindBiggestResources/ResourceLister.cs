@@ -1,11 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 internal class ResourceLister : IResourceLister
 {
     private readonly ILogger<IResourceLister> _logger;
-    private int _persistentCounter;
 
     public ResourceLister(ILogger<IResourceLister> logger)
     {
@@ -14,16 +12,14 @@ internal class ResourceLister : IResourceLister
 
     public async Task<int> Run()
     {
-        Stopwatch sw = new Stopwatch();
         List<DirData> dirs = new List<DirData>();
 
         //inputs
         string startPath = @"C:\";
-        int searchLevelsDeep = 4;
+        int searchLevelsDeep = 6;
+        int numOfFilesToShowInOutput = 35;
 
         _logger.LogDebug("Recursing all directories...");
-
-        sw.Start();
 
         RecurseDirsFromPath(startPath, dirs);
 
@@ -33,71 +29,50 @@ internal class ResourceLister : IResourceLister
 
         _logger.LogDebug("Finding largest directories...");
 
-        _persistentCounter = 0;
-
         List<DirData> filteredDirs = dirs.GetDirsDeep(searchLevelsDeep).FilterWindowsDirectories();
 
-        _logger.LogDebug("Done. Found {NoOfDirs} directories in {Time} sec/s", dirs.Count, sw.ElapsedMilliseconds / 1000);
-        _logger.LogDebug("Filtered down to {FilteredDirsCount} directories", filteredDirs.Count);
+        _logger.LogDebug("Done. Found {NoOfDirs} directories. {FilteredDirsCount} will be analysed", dirs.Count, filteredDirs.Count);
 
         Parallel.ForEach(filteredDirs, dirAlreadyScanned =>
-        {
-            //if (_persistentCounter > 0 && _persistentCounter % 500 == 0)
-            //    _logger.LogDebug($"Analysed size of {_persistentCounter}/{filteredDirs.Count} directories");
+            matches.Add(new DirData(dirAlreadyScanned.Path, GetTotalSizeInKb(filteredDirs.Where(dir => dir.Path.Contains(dirAlreadyScanned.Path)).ToList()))));
 
-            matches.Add(new DirData(dirAlreadyScanned.Path, GetTotalSizeInKb(filteredDirs, dirAlreadyScanned)));
-        });
+        LogOutput(matches.OrderByDescending(dir => dir.Size).ToList(), numOfFilesToShowInOutput);
 
-        //foreach (DirData dirAlreadyScanned in filteredDirs)
-        //{
-        //    if (_persistentCounter > 0 && _persistentCounter % 1000 == 0)
-        //        _logger.LogDebug($"Analysed size of {_persistentCounter}/{filteredDirs.Count} directories");
-
-        //    matches.Add(new DirData(dirAlreadyScanned.Path, GetTotalSizeInKb(filteredDirs, dirAlreadyScanned)));
-
-        //    _persistentCounter++;
-        //}
-
-        matches = matches.OrderByDescending(dir => dir.Size).ToList();
-
-        LogOutput(matches);
-
-        _logger.LogDebug("Done. All tasks complete in {Time} sec/s", sw.ElapsedMilliseconds / 1000);
+        _logger.LogDebug("All operations complete");
 
         return await Task.FromResult(0);
     }    
 
-    private double GetTotalSizeInKb(List<DirData> dirs, DirData dirAlreadyScanned) => 
-        dirs.Where(dir => dir.Path.Contains(dirAlreadyScanned.Path))
-            .Select(dir => dir.Size / 1024)
+    private double GetTotalSizeInKb(List<DirData> dirs) => 
+        dirs.Select(dir => dir.Size / 1024)
             .Sum()
-            .ToTwoDecimalPlaces();   
+            .ToTwoDecimalPlaces();
     
-    private void LogOutput(List<DirData> matches)
+    private void LogOutput(List<DirData> matches, int numOfFilesToShowInOutput)
     {
         int counter = 0;
+        double totalSize = 0;
 
-        foreach (DirData dir in matches.Take(100))
+        foreach (DirData dir in matches.Take(numOfFilesToShowInOutput))
         {
+            totalSize += dir.Size;
             double sizeMB = (dir.Size / 1024).ToTwoDecimalPlaces();
             double sizeGB = (sizeMB / 1024).ToTwoDecimalPlaces();
-            _logger.LogDebug("#{Counter} Total Size for dir: {Dir} :: " + $"{dir.Size}KB" + ((dir.Size > 1024) ? $" {sizeMB}MB" : "") + ((sizeMB > 1024) ? $" {sizeGB}GB" : ""), ++counter, dir.Path, dir.Size);
+            //make this formatted logging
+            _logger.LogInformation("#{Counter} Total Size for dir: {Dir} :: " + $"{dir.Size}KB" + ((dir.Size > 1024) ? $" {sizeMB}MB" : "") + ((sizeMB > 1024) ? $" {sizeGB}GB" : ""), ++counter, dir.Path, dir.Size);
         }
+
+        _logger.LogDebug("Total Size for all files listed: {Size}GB", ((totalSize / 1024) / 1024).ToTwoDecimalPlaces());
     }
 
     private void RecurseDirsFromPath(string path, List<DirData> dirData)
     {
-        //if (_persistentCounter > 0 && _persistentCounter % 50000 == 0)
-        //    _logger.LogDebug($"Scanned {_persistentCounter} directories");
-
         try
         {
             dirData.Add(new DirData(path, new DirectoryInfo(path).GetFiles().Select(file => file.Length).Sum()));
-            //_persistentCounter++;
         }
         catch (Exception ex)
         {
-            //_logger.LogWarning("Cant scan path: {Path}. Error: {ErrorMessage}", path, ex.Message);
             return;
         }
 
@@ -105,16 +80,12 @@ internal class ResourceLister : IResourceLister
         {
             RecurseDirsFromPath(dir, dirData);
         });
-
-        //Directory.GetDirectories(path).ToList().ForEach(dir =>
-        //{
-        //    RecurseDirsFromPath(dir, dirData);
-        //});
     }
 }
 
 public static class DoubleExtensions
 {
+    //add this path to the recurse method above, and see if we can continue if we are searching a path too deep
     public static List<DirData> GetDirsDeep(this List<DirData> dirs, int searchLevelsDeep) =>
         dirs.Where(dir => new Regex($@"^[a-zA-Z]:\\[^\\/:*?""<>|\r\n]+(\\[^\\/:*?""<>|\r\n]+){{0,{searchLevelsDeep}}}\\?$")
         .Matches(dir.Path).Count > 0)
