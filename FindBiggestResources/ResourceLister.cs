@@ -1,47 +1,65 @@
 ﻿using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 internal class ResourceLister : IResourceLister
 {
     private readonly ILogger<IResourceLister> _logger;
+    private readonly CommandLineOptions _commandLineOptions;
 
-    public ResourceLister(ILogger<IResourceLister> logger)
+    public ResourceLister(ILogger<IResourceLister> logger, CommandLineOptions commandLineOptions)
     {
         _logger = logger;
+        _commandLineOptions = commandLineOptions;
     }
 
-    public async Task<int> Run()
+    public async Task<int> RunAsync()
     {
+        Stopwatch sw = Stopwatch.StartNew();
         List<DirData> dirs = new List<DirData>();
 
-        //inputs
-        string startPath = @"C:\";
-        int searchLevelsDeep = 6;
-        int numOfFilesToShowInOutput = 35;
+        _logger.LogInformation($"Recursing all directories from {_commandLineOptions.Path}");
 
-        _logger.LogDebug("Recursing all directories...");
+        bool isProcessing = true;
+        Task waitOutputTask = ShowWaitOutputAsync(() => isProcessing);
 
-        RecurseDirsFromPath(startPath, dirs);
-
+        RecurseDirsFromPath(_commandLineOptions.Path, dirs);
         dirs.RemoveAt(0);
+
+        isProcessing = false;
+        await waitOutputTask;
+        Console.WriteLine();        
+
+        _logger.LogInformation("Done. Found {NoOfDirs} directories to be analysed. Scanning for largest directories", dirs.Count);
 
         List<DirData> matches = new List<DirData>();
 
-        _logger.LogDebug("Finding largest directories...");
+        isProcessing = true;
+        waitOutputTask = ShowWaitOutputAsync(() => isProcessing);
 
-        List<DirData> filteredDirs = dirs.GetDirsDeep(searchLevelsDeep).FilterWindowsDirectories();
+        Parallel.ForEach(dirs, dir => matches.Add(new DirData(dir.Path, GetTotalSizeInKb(dirs.Where(d => d.Path.Contains(dir.Path)).ToList()))));
 
-        _logger.LogDebug("Done. Found {NoOfDirs} directories. {FilteredDirsCount} will be analysed", dirs.Count, filteredDirs.Count);
+        isProcessing = false;
+        await waitOutputTask;
+        Console.WriteLine();
 
-        Parallel.ForEach(filteredDirs, dirAlreadyScanned =>
-            matches.Add(new DirData(dirAlreadyScanned.Path, GetTotalSizeInKb(filteredDirs.Where(dir => dir.Path.Contains(dirAlreadyScanned.Path)).ToList()))));
+        LogOutput(matches.FilterTopMatchesBySize(), _commandLineOptions.OutputSize);
 
-        LogOutput(matches.OrderByDescending(dir => dir.Size).ToList(), numOfFilesToShowInOutput);
-
-        _logger.LogDebug("All operations complete");
+        _logger.LogInformation("All operations complete in {Time} sec/s", sw.ElapsedMilliseconds / 1000);
 
         return await Task.FromResult(0);
-    }    
+    }
+
+    private Task ShowWaitOutputAsync(Func<bool> isProcessingFunc)
+    {
+        return Task.Run(async () =>
+        {
+            while (isProcessingFunc())
+            {
+                Console.Write(".");
+                await Task.Delay(500);
+            }
+        });
+    }
 
     private double GetTotalSizeInKb(List<DirData> dirs) => 
         dirs.Select(dir => dir.Size / 1024)
@@ -52,26 +70,33 @@ internal class ResourceLister : IResourceLister
     {
         int counter = 0;
         double totalSize = 0;
+        string output = $"{"#",-3} {"Path",-60} {"Size"}";
+        _logger.LogInformation(output);
 
         foreach (DirData dir in matches.Take(numOfFilesToShowInOutput))
         {
             totalSize += dir.Size;
             double sizeMB = (dir.Size / 1024).ToTwoDecimalPlaces();
             double sizeGB = (sizeMB / 1024).ToTwoDecimalPlaces();
-            //make this formatted logging
-            _logger.LogInformation("#{Counter} Total Size for dir: {Dir} :: " + $"{dir.Size}KB" + ((dir.Size > 1024) ? $" {sizeMB}MB" : "") + ((sizeMB > 1024) ? $" {sizeGB}GB" : ""), ++counter, dir.Path, dir.Size);
+            string dirSize = (sizeMB > 1024) ? $"{sizeGB}GB" : ((dir.Size > 1024) ? $"{sizeMB}MB" : $"{dir.Size}KB");            
+
+            output = $"{++counter,-3} {dir.Path,-60} {dirSize}";
+            _logger.LogInformation(output);
         }
 
-        _logger.LogDebug("Total Size for all files listed: {Size}GB", ((totalSize / 1024) / 1024).ToTwoDecimalPlaces());
+        _logger.LogInformation("Total Size for all files listed: {Size}GB", ((totalSize / 1024) / 1024).ToTwoDecimalPlaces());
     }
 
     private void RecurseDirsFromPath(string path, List<DirData> dirData)
     {
+        if (path.Contains("C:\\Windows"))
+            return;
+
         try
         {
             dirData.Add(new DirData(path, new DirectoryInfo(path).GetFiles().Select(file => file.Length).Sum()));
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return;
         }
@@ -81,23 +106,6 @@ internal class ResourceLister : IResourceLister
             RecurseDirsFromPath(dir, dirData);
         });
     }
-}
-
-public static class DoubleExtensions
-{
-    //add this path to the recurse method above, and see if we can continue if we are searching a path too deep
-    public static List<DirData> GetDirsDeep(this List<DirData> dirs, int searchLevelsDeep) =>
-        dirs.Where(dir => new Regex($@"^[a-zA-Z]:\\[^\\/:*?""<>|\r\n]+(\\[^\\/:*?""<>|\r\n]+){{0,{searchLevelsDeep}}}\\?$")
-        .Matches(dir.Path).Count > 0)
-        .ToList();
-
-    public static List<DirData> FilterWindowsDirectories(this List<DirData> dirs) =>
-        dirs.Where(x => !x.Path.Contains("C:\\Windows")).ToList();
-}
-
-public static class DirectoryExtensions
-{
-    public static double ToTwoDecimalPlaces(this double num) => Math.Round(num, 2);
 }
 
 public class DirData

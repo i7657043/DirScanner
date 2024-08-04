@@ -27,11 +27,9 @@ internal class ConsoleHostedService : IHostedService
 
                 try
                 {
-                    _logger.LogInformation("{AppName} Process started", appName);
+                    int exitCode = await _app.RunAsync();
 
-                    int exitCode = await _app.Run();
-
-                    _logger.LogInformation("{AppName} Process finished with Exit Code: {@ExitCode}", appName, exitCode);
+                    _logger.LogDebug("{AppName} Process finished with Exit Code: {@ExitCode}", appName, exitCode);
 
                     _appLifetime.StopApplication();
                 }

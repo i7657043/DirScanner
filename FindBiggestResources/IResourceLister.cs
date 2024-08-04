@@ -1,5 +1,5 @@
 ﻿internal interface IResourceLister
 {
-    Task<int> Run();
+    Task<int> RunAsync();
 }
 

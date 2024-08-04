@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using CommandLine;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Serilog.Events;
 using System.Reflection;
 
 internal class Program
@@ -21,29 +21,73 @@ internal class Program
                })
                .ConfigureServices((hostContext, services) =>
                {
-                   string loggerOutputFormat = "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}";
+                   CommandLineOptions commandLineOptions = new CommandLineOptions();
 
-                   SetupLogger(loggerOutputFormat);
+                   Parser.Default.ParseArguments<Options>(args)
+                   .WithParsed(options =>
+                   {
+                       SetupLogger(options.Verbose);
 
-                   Log.Logger.Information("Resource Lister Process starting...");
+                       Log.Logger.Debug("Process started");
 
-                   services.Configure<ConsoleLifetimeOptions>(options => options.SuppressStatusMessages = true);
+                       if (!string.IsNullOrEmpty(options.Path))
+                           commandLineOptions.Path = options.Path;
+                       else
+                       {
+                           string? path = GetPathFromInput();
+                           if (path != null)
+                               commandLineOptions.Path = path;
+                           else
+                               Log.Logger.Information($"Using default path: {commandLineOptions.Path} as the root of the search");
+                       }
+                       if (!Directory.Exists(commandLineOptions.Path))
+                           throw new PathException(commandLineOptions.Path);
 
-                   services.AddSingleton<IResourceLister, ResourceLister>().AddHostedService<ConsoleHostedService>();
+                       commandLineOptions.OutputSize = options.Size > 0 ? options.Size : commandLineOptions.OutputSize;
+
+                   });
+
+                   Log.Logger.Debug("Resource Lister Process starting...");
+
+                   services.Configure((Action<ConsoleLifetimeOptions>)(options => options.SuppressStatusMessages = true));
+
+                   services.AddSingleton(commandLineOptions)
+                   .AddSingleton<IResourceLister, ResourceLister>()
+                   .AddHostedService<ConsoleHostedService>();
                })
                .UseSerilog()
                .RunConsoleAsync();
         }
+        catch (ArgumentException aex)
+        {
+            Log.Logger.Fatal($"{aex.Message}");
+        }
+        catch (PathException pex)
+        {
+            Log.Logger.Fatal("Path: {Path} was not recognised. Please choose another", pex.Path);
+        }        
         catch (Exception ex)
         {
             Log.Logger.Fatal("There was a fatal error on Startup. Exiting application {@Exception}", ex);
         }
     }
 
-    private static void SetupLogger(string loggerOutputFormat)
+    private static string? GetPathFromInput()
     {
+        Console.Write("Please enter a path to use as the root of the search (or hit enter to use the default): ");
+        string path = Console.ReadLine() ?? string.Empty;
+        if (!string.IsNullOrEmpty(path))
+            return path;
+
+        return null;
+    }
+
+    private static void SetupLogger(bool verboseLogging)
+    {
+        string loggerOutputFormat = verboseLogging ? "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}";
+
         Log.Logger = new LoggerConfiguration()
-        .MinimumLevel.Debug()
+        .MinimumLevel.Is(verboseLogging ? Serilog.Events.LogEventLevel.Debug : Serilog.Events.LogEventLevel.Information)
         .WriteTo.File("log.txt", outputTemplate: loggerOutputFormat)
         .WriteTo.Console(outputTemplate: loggerOutputFormat)
         .CreateLogger();

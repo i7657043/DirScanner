@@ -1,0 +1,8 @@
+      {
+  "profiles": {
+    "FindBiggestResources": {
+      "commandName": "Project",
+      "commandLineArgs": "-p \"C:\\Program Files\" -s 100"
+    }
+  }
+}
