@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Reflection;
+using System.Text;
 
 internal class Program
 {
@@ -31,7 +32,9 @@ internal class Program
                        Log.Logger.Debug("Process started");
 
                        if (!string.IsNullOrEmpty(options.Path))
-                           commandLineOptions.Path = options.Path;
+                       {
+                           commandLineOptions.Path = CapitaliseDriveLetterOfPath(options.Path);
+                       }
                        else
                        {
                            string? path = GetPathFromInput();
@@ -52,6 +55,7 @@ internal class Program
                    services.Configure((Action<ConsoleLifetimeOptions>)(options => options.SuppressStatusMessages = true));
 
                    services.AddSingleton(commandLineOptions)
+                   .AddSingleton<IDirectoryScanner, DirectoryScanner>()
                    .AddSingleton<IResourceLister, ResourceLister>()
                    .AddHostedService<ConsoleHostedService>();
                })
@@ -70,6 +74,14 @@ internal class Program
         {
             Log.Logger.Fatal("There was a fatal error on Startup. Exiting application {@Exception}", ex);
         }
+    }
+
+    private static string CapitaliseDriveLetterOfPath(string path)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.Append(char.ToUpper(path[0]));
+        sb.Append(path.Substring(1));
+        return sb.ToString();
     }
 
     private static string? GetPathFromInput()
