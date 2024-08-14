@@ -1,6 +1,4 @@
-﻿using System.Text.RegularExpressions;
-
-public static class DirExtensions
+﻿public static class DirExtensions
 {
     public static List<DirData> FilterTopMatchesBySize(this List<DirData> dirs)
     {

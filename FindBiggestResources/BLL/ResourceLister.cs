@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 
 internal class ResourceLister : IResourceLister
@@ -7,12 +6,18 @@ internal class ResourceLister : IResourceLister
     private readonly ILogger<IResourceLister> _logger;
     private readonly CommandLineOptions _commandLineOptions;
     private readonly IDirectoryScanner _directoryScanner;
+    private readonly IProgressBar _progresssBar;
 
-    public ResourceLister(ILogger<IResourceLister> logger, CommandLineOptions commandLineOptions, IDirectoryScanner directoryScanner)
+    public ResourceLister(
+        ILogger<IResourceLister> logger, 
+        CommandLineOptions commandLineOptions, 
+        IDirectoryScanner directoryScanner,
+        IProgressBar progressBar)
     {
         _logger = logger;
         _commandLineOptions = commandLineOptions;
         _directoryScanner = directoryScanner;
+        _progresssBar = progressBar;
     }
 
     public async Task<int> RunAsync()
@@ -22,18 +27,16 @@ internal class ResourceLister : IResourceLister
 
         _logger.LogInformation($"Recursing all directories from {_commandLineOptions.Path}");
 
-        Task processingTask = ConoleLoggingOutput.ShowWaitOutputAsync();
+        _progresssBar.Start();
         _directoryScanner.RecurseDirsFromPath(_commandLineOptions.Path, dirs);
         dirs.RemoveAt(0);
-        ConoleLoggingOutput.IsProcessing = false;
-        await processingTask;
+        await _progresssBar.Stop();
 
-        _logger.LogInformation("\nDone. Found {NoOfDirs} directories to be analysed. Scanning for largest directories", dirs.Count);
+        _logger.LogInformation("Done. Found {NoOfDirs} directories to be analysed. Scanning for largest directories", dirs.Count);
 
-        processingTask = ConoleLoggingOutput.ShowWaitOutputAsync();
-        List<DirData> analysedDirs = GetAllDirSizes(dirs);
-        ConoleLoggingOutput.IsProcessing = false;
-        await processingTask;
+        _progresssBar.Start();
+        List<DirData> analysedDirs = _directoryScanner.GetAllDirSizes(dirs);
+        await _progresssBar.Stop();
 
         LogDirBySize(analysedDirs.FilterTopMatchesBySize(), _commandLineOptions.OutputSize);
 
@@ -41,31 +44,11 @@ internal class ResourceLister : IResourceLister
 
         return await Task.FromResult(0);
     }
-
-    private static List<DirData> GetAllDirSizes(List<DirData> dirs)
-    {
-        ConcurrentBag<DirData> concurrentMatches = new ConcurrentBag<DirData>();
-
-        Parallel.ForEach(dirs.DirsByDeep(), dir =>
-        {
-            lock (concurrentMatches)
-            {
-                if (concurrentMatches.Any(d => dir.Path.Contains(d.Path)))
-                    return;
-            }
-
-            concurrentMatches.Add(new DirData(
-                dir.Path, 
-                dirs.Where(d => d.Path.Contains(dir.Path)).ToList().GetTotalSizeInKb()));
-        });
-
-        return concurrentMatches.ToList();
-    }
-
+    
     private void LogDirBySize(List<DirData> matches, int numOfFilesToShowInOutput)
     {
         int counter = 0;
-        _logger.LogInformation($"\n{"#",-3} {"Path",-60} {"Size"}");
+        _logger.LogInformation($"{"#",-3} {"Path",-60} {"Size"}");
 
         foreach (DirData dir in matches.Take(numOfFilesToShowInOutput))
         {

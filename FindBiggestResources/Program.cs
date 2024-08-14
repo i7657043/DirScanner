@@ -1,10 +1,10 @@
 ﻿using CommandLine;
+using FindBiggestResources.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Reflection;
-using System.Text;
 
 internal class Program
 {
@@ -27,27 +27,9 @@ internal class Program
                    Parser.Default.ParseArguments<Options>(args)
                    .WithParsed(options =>
                    {
-                       SetupLogger(options.Verbose);
+                       Log.Logger = SetupLogger(options.Verbose);
 
-                       Log.Logger.Debug("Process started");
-
-                       if (!string.IsNullOrEmpty(options.Path))
-                       {
-                           commandLineOptions.Path = CapitaliseDriveLetterOfPath(options.Path);
-                       }
-                       else
-                       {
-                           string? path = GetPathFromInput();
-                           if (path != null)
-                               commandLineOptions.Path = path;
-                           else
-                               Log.Logger.Information($"Using default path: {commandLineOptions.Path} as the root of the search");
-                       }
-                       if (!Directory.Exists(commandLineOptions.Path))
-                           throw new PathException(commandLineOptions.Path);
-
-                       commandLineOptions.OutputSize = options.Size > 0 ? options.Size : commandLineOptions.OutputSize;
-
+                       commandLineOptions = options.ParseCommandLineOptions();
                    });
 
                    Log.Logger.Debug("Resource Lister Process starting...");
@@ -55,6 +37,7 @@ internal class Program
                    services.Configure((Action<ConsoleLifetimeOptions>)(options => options.SuppressStatusMessages = true));
 
                    services.AddSingleton(commandLineOptions)
+                   .AddSingleton<IProgressBar, ProgressBar>()
                    .AddSingleton<IDirectoryScanner, DirectoryScanner>()
                    .AddSingleton<IResourceLister, ResourceLister>()
                    .AddHostedService<ConsoleHostedService>();
@@ -76,32 +59,11 @@ internal class Program
         }
     }
 
-    private static string CapitaliseDriveLetterOfPath(string path)
+    private static ILogger SetupLogger(bool verboseLogging)
     {
-        StringBuilder sb = new StringBuilder();
-        sb.Append(char.ToUpper(path[0]));
-        sb.Append(path.Substring(1));
-        return sb.ToString();
-    }
-
-    private static string? GetPathFromInput()
-    {
-        Console.Write("Please enter a path to use as the root of the search (or hit enter to use the default): ");
-        string path = Console.ReadLine() ?? string.Empty;
-        if (!string.IsNullOrEmpty(path))
-            return path;
-
-        return null;
-    }
-
-    private static void SetupLogger(bool verboseLogging)
-    {
-        string loggerOutputFormat = verboseLogging ? "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}";
-
-        Log.Logger = new LoggerConfiguration()
+        return new LoggerConfiguration()
         .MinimumLevel.Is(verboseLogging ? Serilog.Events.LogEventLevel.Debug : Serilog.Events.LogEventLevel.Information)
-        .WriteTo.File("log.txt", outputTemplate: loggerOutputFormat)
-        .WriteTo.Console(outputTemplate: loggerOutputFormat)
+        .WriteTo.Console(outputTemplate: verboseLogging ? "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}")
         .CreateLogger();
     }
 }
