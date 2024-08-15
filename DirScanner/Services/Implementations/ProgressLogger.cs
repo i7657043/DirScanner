@@ -1,7 +1,7 @@
-﻿using FindBiggestResources.Services.Abstractions;
+﻿using DirScanner.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 
-namespace FindBiggestResources.Services.Implementations
+namespace DirScanner.Services.Implementations
 {
     internal class ProgressLogger : IProgressLogger
     {

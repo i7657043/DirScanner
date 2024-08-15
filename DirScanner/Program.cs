@@ -1,7 +1,7 @@
 ﻿using CommandLine;
-using FindBiggestResources.Extensions;
-using FindBiggestResources.Services.Abstractions;
-using FindBiggestResources.Services.Implementations;
+using DirScanner.Extensions;
+using DirScanner.Services.Abstractions;
+using DirScanner.Services.Implementations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -57,7 +57,7 @@ internal class Program
         catch (PathException pex)
         {
             Log.Logger.Fatal("Path: {Path} was not recognised. Please choose another", pex.Path);
-        }        
+        }
         catch (Exception ex)
         {
             Log.Logger.Fatal("There was a fatal error on Startup. Exiting application {@Exception}", ex);

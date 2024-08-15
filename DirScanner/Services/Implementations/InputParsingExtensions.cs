@@ -1,18 +1,15 @@
-﻿using FindBiggestResources.Services.Abstractions;
+﻿using DirScanner.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
-namespace FindBiggestResources.Services.Implementations
+namespace DirScanner.Services.Implementations
 {
     internal class InputParsingHelpers : IInputParsingHelpers
     {
         private readonly ILogger<IInputParsingHelpers> _logger;
-        private const string DriveLetterRegex = @"^[A-Za-z]:\\$";
 
-        public InputParsingHelpers(ILogger<IInputParsingHelpers> logger)
-        {
-            _logger = logger;
-        }
+        public InputParsingHelpers(ILogger<IInputParsingHelpers> logger) =>
+            _logger = logger;        
 
         public (bool, string) GetUserInputForWhichPathToDrillInto(List<DirData> largestDirsListed, string path)
         {
@@ -30,7 +27,8 @@ namespace FindBiggestResources.Services.Implementations
                 }
                 else if (value?.ToLower() == "..")
                 {
-                    if (new Regex(DriveLetterRegex).IsMatch(path))
+                    //Drive letter regex i.e. matches "C:\" but not a\b
+                    if (new Regex(@"^[A-Za-z]:\\$").IsMatch(path))
                     {
                         _logger.LogInformation($"Cannot move up a directory from {path}\n{output}");
                         continue;

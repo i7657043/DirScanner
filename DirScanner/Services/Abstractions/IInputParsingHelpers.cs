@@ -1,4 +1,4 @@
-﻿namespace FindBiggestResources.Services.Abstractions
+﻿namespace DirScanner.Services.Abstractions
 {
     internal interface IInputParsingHelpers
     {

@@ -1,4 +1,4 @@
-﻿using FindBiggestResources.Services.Abstractions;
+﻿using DirScanner.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
