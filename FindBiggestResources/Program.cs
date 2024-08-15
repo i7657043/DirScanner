@@ -1,7 +1,7 @@
 ﻿using CommandLine;
 using FindBiggestResources.BLL;
-using FindBiggestResources.Events;
 using FindBiggestResources.Extensions;
+using FindBiggestResources.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
