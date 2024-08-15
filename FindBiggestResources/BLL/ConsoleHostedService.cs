@@ -6,9 +6,9 @@ internal class ConsoleHostedService : IHostedService
 {
     private readonly ILogger _logger;
     private readonly IHostApplicationLifetime _appLifetime;
-    private readonly IResourceLister _app;
+    private readonly IDirScannerController _app;
     
-    public ConsoleHostedService(ILogger<ConsoleHostedService> logger, IHostApplicationLifetime appLifetime, IResourceLister app)
+    public ConsoleHostedService(ILogger<ConsoleHostedService> logger, IHostApplicationLifetime appLifetime, IDirScannerController app)
     {
         _logger = logger;
         _appLifetime = appLifetime;

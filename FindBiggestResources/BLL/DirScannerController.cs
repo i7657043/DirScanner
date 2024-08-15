@@ -1,19 +1,18 @@
-﻿using FindBiggestResources.BLL;
-using FindBiggestResources.Services;
+﻿using FindBiggestResources.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
-internal class ResourceLister : IResourceLister
+internal class DirScannerController : IDirScannerController
 {
-    private readonly ILogger<IResourceLister> _logger;
+    private readonly ILogger<IDirScannerController> _logger;
     private readonly CommandLineOptions _commandLineOptions;
     private readonly IDirectoryScanner _directoryScanner;
     private readonly IProgressBar _progresssBar;
     private readonly IInputParsingHelpers _inputParsingHelpers;
     private readonly IProgressLogger _progressLogger;
 
-    public ResourceLister(
-        ILogger<IResourceLister> logger, 
+    public DirScannerController(
+        ILogger<IDirScannerController> logger, 
         CommandLineOptions commandLineOptions, 
         IDirectoryScanner directoryScanner,
         IProgressBar progressBar,
@@ -30,14 +29,12 @@ internal class ResourceLister : IResourceLister
 
     public async Task<int> RunAsync()
     {
-        (bool DrillDeeper, string Path) runInfo = (true, _commandLineOptions.Path);
+        (bool DrillDeeper, string Path) directoryScanningOptions = (true, _commandLineOptions.Path);
 
-        while (runInfo.DrillDeeper)
-        {
-            List<DirData> largestDirsListed = await RecurseDirs(runInfo.Path);
-
-            runInfo = _inputParsingHelpers.ParseNextPath(largestDirsListed, runInfo.Path);
-        }
+        while (directoryScanningOptions.DrillDeeper)
+            directoryScanningOptions = _inputParsingHelpers.GetUserInputForWhichPathToDrillInto(
+                await RecurseDirs(directoryScanningOptions.Path), 
+                directoryScanningOptions.Path);        
 
         return await Task.FromResult(0);
     }    
@@ -53,9 +50,9 @@ internal class ResourceLister : IResourceLister
         await _progressLogger.LogRecursedAsync(dirs.Count);
 
         _progressLogger.LogAnalysing();
-        List<DirData> analysedDirs = _directoryScanner.GetAllDirSizes(dirs).FilterTopMatchesBySize();
-        await _progressLogger.LogAnalysed(analysedDirs, _commandLineOptions.OutputSize, sw.ElapsedMilliseconds / 1000);
+        dirs = _directoryScanner.GetAllDirSizes(dirs).FilterTopMatchesBySize();
+        await _progressLogger.LogAnalysed(dirs, _commandLineOptions.OutputSize, sw.ElapsedMilliseconds / 1000);
 
-        return analysedDirs;
+        return dirs;
     }
 }

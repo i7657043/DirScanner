@@ -1,7 +1,7 @@
 ﻿using CommandLine;
-using FindBiggestResources.BLL;
 using FindBiggestResources.Extensions;
-using FindBiggestResources.Services;
+using FindBiggestResources.Services.Abstractions;
+using FindBiggestResources.Services.Implementations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,12 +29,13 @@ internal class Program
                    Parser.Default.ParseArguments<Options>(args)
                    .WithParsed(options =>
                    {
-                       Log.Logger = SetupLogger(options.Verbose);
+                       Log.Logger = new LoggerConfiguration()
+                       .MinimumLevel.Is(options.Verbose ? Serilog.Events.LogEventLevel.Verbose : Serilog.Events.LogEventLevel.Information)
+                       .WriteTo.Console(outputTemplate: options.Verbose ? "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}")
+                       .CreateLogger();
 
                        commandLineOptions = options.ParseCommandLineOptions();
                    });
-
-                   Log.Logger.Debug("Resource Lister Process starting...");
 
                    services.Configure((Action<ConsoleLifetimeOptions>)(options => options.SuppressStatusMessages = true));
 
@@ -43,7 +44,7 @@ internal class Program
                    .AddSingleton<IInputParsingHelpers, InputParsingHelpers>()
                    .AddSingleton<IProgressBar, ProgressBar>()
                    .AddSingleton<IDirectoryScanner, DirectoryScanner>()
-                   .AddSingleton<IResourceLister, ResourceLister>()
+                   .AddSingleton<IDirScannerController, DirScannerController>()
                    .AddHostedService<ConsoleHostedService>();
                })
                .UseSerilog()
@@ -61,13 +62,5 @@ internal class Program
         {
             Log.Logger.Fatal("There was a fatal error on Startup. Exiting application {@Exception}", ex);
         }
-    }
-
-    private static ILogger SetupLogger(bool verboseLogging)
-    {
-        return new LoggerConfiguration()
-        .MinimumLevel.Is(verboseLogging ? Serilog.Events.LogEventLevel.Debug : Serilog.Events.LogEventLevel.Information)
-        .WriteTo.Console(outputTemplate: verboseLogging ? "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}")
-        .CreateLogger();
     }
 }

@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using FindBiggestResources.Services.Abstractions;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
-namespace FindBiggestResources.BLL
+namespace FindBiggestResources.Services.Implementations
 {
     internal class InputParsingHelpers : IInputParsingHelpers
     {
@@ -13,9 +14,9 @@ namespace FindBiggestResources.BLL
             _logger = logger;
         }
 
-        public (bool, string) ParseNextPath(List<DirData> largestDirsListed, string path)
+        public (bool, string) GetUserInputForWhichPathToDrillInto(List<DirData> largestDirsListed, string path)
         {
-            string output = "\nEnter a number like \"1\" to drill down into a directory, or \"..\" to go back up (Or type \"exit\" to quit): ";
+            string output = "Enter a number like \"1\" to drill down into a directory, or \"..\" to go back up (Or type \"exit\" to quit): ";
 
             _logger.LogInformation(output);
 
@@ -31,7 +32,7 @@ namespace FindBiggestResources.BLL
                 {
                     if (new Regex(DriveLetterRegex).IsMatch(path))
                     {
-                        _logger.LogInformation($"Cannot move up a directory from {path} {output}");
+                        _logger.LogInformation($"Cannot move up a directory from {path}\n{output}");
                         continue;
                     }
 
@@ -42,7 +43,7 @@ namespace FindBiggestResources.BLL
                 bool success = int.TryParse(value, out int choice);
                 if (!success || choice < 1 || choice > largestDirsListed.Count)
                 {
-                    _logger.LogInformation($"\n\"{value}\" is not a valid number {output}");
+                    _logger.LogInformation($"\"{value}\" is not a valid number\n{output}");
                     continue;
                 }
 

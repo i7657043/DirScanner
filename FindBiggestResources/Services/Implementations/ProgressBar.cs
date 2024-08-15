@@ -1,10 +1,4 @@
-﻿public interface IProgressBar
-{
-    void Start();
-    Task Stop();
-}
-
-public class ProgressBar : IProgressBar
+﻿public class ProgressBar : IProgressBar
 {
     private volatile bool processing = false;
     private Task? task;

@@ -1,13 +1,14 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using FindBiggestResources.Services.Abstractions;
+using Microsoft.Extensions.Logging;
 
-namespace FindBiggestResources.Services
+namespace FindBiggestResources.Services.Implementations
 {
     internal class ProgressLogger : IProgressLogger
     {
-        private readonly ILogger<IResourceLister> _logger;
+        private readonly ILogger<IDirScannerController> _logger;
         private readonly IProgressBar _progresssBar;
 
-        public ProgressLogger(ILogger<IResourceLister> logger, IProgressBar progresssBar)
+        public ProgressLogger(ILogger<IDirScannerController> logger, IProgressBar progresssBar)
         {
             _logger = logger;
             _progresssBar = progresssBar;

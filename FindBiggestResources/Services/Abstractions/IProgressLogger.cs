@@ -1,4 +1,4 @@
-﻿namespace FindBiggestResources.Services
+﻿namespace FindBiggestResources.Services.Abstractions
 {
     internal interface IProgressLogger
     {
