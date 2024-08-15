@@ -1,8 +1,8 @@
-      {
+{
   "profiles": {
     "FindBiggestResources": {
       "commandName": "Project",
-      "commandLineArgs": "-p c:\\"
+      "commandLineArgs": ""
     }
   }
 }

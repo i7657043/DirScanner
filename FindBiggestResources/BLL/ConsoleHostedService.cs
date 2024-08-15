@@ -32,6 +32,12 @@ internal class ConsoleHostedService : IHostedService
                     _logger.LogDebug("{AppName} Process finished with Exit Code: {@ExitCode}", appName, exitCode);
 
                     _appLifetime.StopApplication();
+                }                
+                catch (PathException pex)
+                {
+                    _logger.LogCritical("{AppName} Process exited early with path exception {@Exception}", appName, pex);
+
+                    Environment.Exit(-2);
                 }
                 catch (Exception ex)
                 {

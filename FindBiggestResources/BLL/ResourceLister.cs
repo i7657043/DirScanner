@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using FindBiggestResources.BLL;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 internal class ResourceLister : IResourceLister
 {
@@ -7,44 +9,61 @@ internal class ResourceLister : IResourceLister
     private readonly CommandLineOptions _commandLineOptions;
     private readonly IDirectoryScanner _directoryScanner;
     private readonly IProgressBar _progresssBar;
+    private readonly IInputParsingHelpers _inputParsingHelpers;
 
     public ResourceLister(
         ILogger<IResourceLister> logger, 
         CommandLineOptions commandLineOptions, 
         IDirectoryScanner directoryScanner,
-        IProgressBar progressBar)
+        IProgressBar progressBar,
+        IInputParsingHelpers inputParsingHelpers)
     {
         _logger = logger;
         _commandLineOptions = commandLineOptions;
         _directoryScanner = directoryScanner;
         _progresssBar = progressBar;
+        _inputParsingHelpers = inputParsingHelpers;
     }
 
     public async Task<int> RunAsync()
     {
+        (bool DrillDeeper, string Path) runInfo = (true, _commandLineOptions.Path);
+
+        while (runInfo.DrillDeeper)
+        {
+            List<DirData> largestDirsListed = await RecurseDirsAsync(runInfo.Path);
+
+            runInfo = _inputParsingHelpers.ParseNextPath(largestDirsListed, runInfo.Path);
+        }
+
+        return await Task.FromResult(0);
+    }    
+
+    private async Task<List<DirData>> RecurseDirsAsync(string path)
+    {
         Stopwatch sw = Stopwatch.StartNew();
         List<DirData> dirs = new List<DirData>();
 
-        _logger.LogInformation($"Recursing all directories from {_commandLineOptions.Path}");
+        _logger.LogInformation($"Recursing all directories from {path}");
 
         _progresssBar.Start();
-        _directoryScanner.RecurseDirsFromPath(_commandLineOptions.Path, dirs);
+        _directoryScanner.RecurseDirsFromPath(path, dirs);
         dirs.RemoveAt(0);
         await _progresssBar.Stop();
 
         _logger.LogInformation("Done. Found {NoOfDirs} directories to be analysed. Scanning for largest directories", dirs.Count);
 
         _progresssBar.Start();
-        List<DirData> analysedDirs = _directoryScanner.GetAllDirSizes(dirs);
+        List<DirData> analysedDirs = _directoryScanner.GetAllDirSizes(dirs).FilterTopMatchesBySize();
         await _progresssBar.Stop();
 
-        LogDirBySize(analysedDirs.FilterTopMatchesBySize(), _commandLineOptions.OutputSize);
+        LogDirBySize(analysedDirs, _commandLineOptions.OutputSize);
 
         _logger.LogInformation("All operations complete in {Time} sec/s", sw.ElapsedMilliseconds / 1000);
 
-        return await Task.FromResult(0);
+        return analysedDirs;
     }
-    
+
     private void LogDirBySize(List<DirData> matches, int numOfFilesToShowInOutput)
     {
         int counter = 0;

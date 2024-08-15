@@ -2,7 +2,7 @@
 
 public class Options
 {
-    [Option('s', "outsize", Required = false, HelpText = "Number of records to show in output. Default is 35")]
+    [Option('s', "sizeout", Required = false, HelpText = "Number of records to show in output. Default is 35")]
     public int Size { get; set; }
 
     [Option('p', "path", Required = false, HelpText = @"Path to root of search. Default is C:\")]

@@ -1,4 +1,5 @@
 ﻿using CommandLine;
+using FindBiggestResources.BLL;
 using FindBiggestResources.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,7 @@ internal class Program
                    services.Configure((Action<ConsoleLifetimeOptions>)(options => options.SuppressStatusMessages = true));
 
                    services.AddSingleton(commandLineOptions)
+                   .AddSingleton<IInputParsingHelpers, InputParsingHelpers>()
                    .AddSingleton<IProgressBar, ProgressBar>()
                    .AddSingleton<IDirectoryScanner, DirectoryScanner>()
                    .AddSingleton<IResourceLister, ResourceLister>()
