@@ -26,8 +26,6 @@ namespace FindBiggestResources.Extensions
                     Log.Logger.Information($"Using default path: {commandLineOptions.Path} as the root of the search");
             }
 
-            Log.Logger.Information($"### Current path: {AppContext.BaseDirectory}");
-
             if (!Directory.Exists(commandLineOptions.Path))
                 throw new PathException(commandLineOptions.Path);
 

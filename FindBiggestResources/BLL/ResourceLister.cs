@@ -1,4 +1,5 @@
 ﻿using FindBiggestResources.BLL;
+using FindBiggestResources.Events;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -10,19 +11,37 @@ internal class ResourceLister : IResourceLister
     private readonly IDirectoryScanner _directoryScanner;
     private readonly IProgressBar _progresssBar;
     private readonly IInputParsingHelpers _inputParsingHelpers;
+    private readonly IProgressLogger _progressLogger;
+
+    public event EventHandler<ProgressEventArgs> RecusringProgress;
+    public event EventHandler<RecurseFinishedProgressEventArgs> RecurseFinishedProgress;
+    public event EventHandler<EventArgs> AnalysingProgress;
+    public event EventHandler<AnalysingFinishedProgressEventArgs> AnalysingFinishedProgress;
 
     public ResourceLister(
         ILogger<IResourceLister> logger, 
         CommandLineOptions commandLineOptions, 
         IDirectoryScanner directoryScanner,
         IProgressBar progressBar,
-        IInputParsingHelpers inputParsingHelpers)
+        IInputParsingHelpers inputParsingHelpers,
+        IProgressLogger progressLogger)
     {
         _logger = logger;
         _commandLineOptions = commandLineOptions;
         _directoryScanner = directoryScanner;
         _progresssBar = progressBar;
         _inputParsingHelpers = inputParsingHelpers;
+        _progressLogger = progressLogger;
+
+        RecusringProgress += _progressLogger.OnRecursing;
+
+        RecurseFinishedProgress += async (sender, e) =>
+            await _progressLogger.OnRecursedAsync(sender!, e);
+
+        AnalysingProgress += _progressLogger.OnAnalysing;
+
+        AnalysingFinishedProgress += async (sender, e) =>
+            await _progressLogger.OnAnalysed(sender!, e);
     }
 
     public async Task<int> RunAsync()
@@ -31,7 +50,7 @@ internal class ResourceLister : IResourceLister
 
         while (runInfo.DrillDeeper)
         {
-            List<DirData> largestDirsListed = await RecurseDirsAsync(runInfo.Path);
+            List<DirData> largestDirsListed = RecurseDirs(runInfo.Path);
 
             runInfo = _inputParsingHelpers.ParseNextPath(largestDirsListed, runInfo.Path);
         }
@@ -39,27 +58,20 @@ internal class ResourceLister : IResourceLister
         return await Task.FromResult(0);
     }    
 
-    private async Task<List<DirData>> RecurseDirsAsync(string path)
+    private List<DirData> RecurseDirs(string path)
     {
         Stopwatch sw = Stopwatch.StartNew();
         List<DirData> dirs = new List<DirData>();
-
-        _logger.LogInformation($"Recursing all directories from {path}");
-
-        _progresssBar.Start();
+        
+        RecusringProgress.Invoke(this, new ProgressEventArgs(path));
         _directoryScanner.RecurseDirsFromPath(path, dirs);
         dirs.RemoveAt(0);
-        await _progresssBar.Stop();
+        RecurseFinishedProgress.Invoke(this, new RecurseFinishedProgressEventArgs(dirs.Count));
 
-        _logger.LogInformation("Done. Found {NoOfDirs} directories to be analysed. Scanning for largest directories", dirs.Count);
-
-        _progresssBar.Start();
+        AnalysingProgress.Invoke(this, new EventArgs());
         List<DirData> analysedDirs = _directoryScanner.GetAllDirSizes(dirs).FilterTopMatchesBySize();
-        await _progresssBar.Stop();
-
-        LogDirBySize(analysedDirs, _commandLineOptions.OutputSize);
-
-        _logger.LogInformation("All operations complete in {Time} sec/s", sw.ElapsedMilliseconds / 1000);
+        AnalysingFinishedProgress.Invoke(this,
+            new AnalysingFinishedProgressEventArgs(analysedDirs, _commandLineOptions.OutputSize, sw.ElapsedMilliseconds / 1000));
 
         return analysedDirs;
     }
