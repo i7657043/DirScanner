@@ -2,6 +2,6 @@
 {
     internal interface IInputParsingHelpers
     {
-        (bool, string) GetUserInputForWhichPathToDrillInto(List<DirData> largestDirsListed, string path);
+        string? GetNextPathFromUserInput(List<DirData> dirs, string path);
     }
 }

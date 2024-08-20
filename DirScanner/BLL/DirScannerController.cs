@@ -29,17 +29,19 @@ internal class DirScannerController : IDirScannerController
 
     public async Task<int> RunAsync()
     {
-        (bool DrillDeeper, string Path) directoryScanningOptions = (true, _commandLineOptions.Path);
+        string? nextPathToAnalyse = _commandLineOptions.Path;
 
-        while (directoryScanningOptions.DrillDeeper)
-            directoryScanningOptions = _inputParsingHelpers.GetUserInputForWhichPathToDrillInto(
-                await RecurseDirs(directoryScanningOptions.Path), 
-                directoryScanningOptions.Path);        
+        while (nextPathToAnalyse != null)
+        {
+            List<DirData> analysedDirs = await AnalyseDirs(nextPathToAnalyse);
+
+            nextPathToAnalyse = _inputParsingHelpers.GetNextPathFromUserInput(analysedDirs, nextPathToAnalyse);
+        }
 
         return await Task.FromResult(0);
     }    
 
-    private async Task<List<DirData>> RecurseDirs(string path)
+    private async Task<List<DirData>> AnalyseDirs(string path)
     {
         Stopwatch sw = Stopwatch.StartNew();
         List<DirData> dirs = new List<DirData>();

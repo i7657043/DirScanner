@@ -31,7 +31,7 @@ internal class Program
                    {
                        Log.Logger = new LoggerConfiguration()
                        .MinimumLevel.Is(options.Verbose ? Serilog.Events.LogEventLevel.Verbose : Serilog.Events.LogEventLevel.Information)
-                       .WriteTo.Console(outputTemplate: options.Verbose ? "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}")
+                       .WriteTo.Console(outputTemplate: options.Verbose ? "{Timestamp:HH:mm:ss} {Message}{NewLine}{Exception}" : "{Message}{NewLine}{Exception}")
                        .CreateLogger();
 
                        commandLineOptions = options.ParseCommandLineOptions();

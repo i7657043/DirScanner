@@ -1,7 +1,13 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 internal class DirectoryScanner : IDirectoryScanner
 {
+    private readonly ILogger<IDirectoryScanner> _logger;
+
+    public DirectoryScanner(ILogger<IDirectoryScanner> logger) =>
+        _logger = logger;    
+
     public void RecurseDirsFromPath(string path, List<DirData> dirData)
     {
         if (path.Contains("C:\\Windows") || path.Contains("C:\\$Recycle.Bin"))
@@ -9,10 +15,11 @@ internal class DirectoryScanner : IDirectoryScanner
 
         try
         {
-            dirData.Add(new DirData(path, new DirectoryInfo(path).GetFiles().Select(file => file.Length).Sum()));
+            dirData.Add(new DirData(path, GetFilesInDirSize(path)));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogDebug("Error: {Error}", ex.Message);
             return;
         }
 
@@ -21,6 +28,9 @@ internal class DirectoryScanner : IDirectoryScanner
             RecurseDirsFromPath(dir, dirData);
         });
     }
+
+    private static long GetFilesInDirSize(string path) =>
+        new DirectoryInfo(path).GetFiles().Select(file => file.Length).Sum();   
 
     public List<DirData> GetAllDirSizes(List<DirData> dirs)
     {
